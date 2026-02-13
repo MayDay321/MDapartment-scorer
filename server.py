@@ -10,8 +10,7 @@ import json
 import time
 import math
 
-app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 
 # ============================================
