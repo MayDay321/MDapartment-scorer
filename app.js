@@ -3,7 +3,7 @@
 // ============================================
 // CONFIG - Change this to your backend URL once deployed
 // ============================================
-const API_URL = "http://localhost:5000";
+const API_URL = "https://mdapartment-scorer.onrender.com";
 // After deploying to Render, change to something like:
 // const API_URL = "https://apartment-scorer-xxxx.onrender.com";
 
