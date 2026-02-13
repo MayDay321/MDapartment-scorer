@@ -191,8 +191,8 @@ async function scoreFromURL() {
 
     const btn = document.getElementById("score-btn");
     btn.disabled = true;
-    btn.textContent = "🔍 Scraping & Analyzing...";
-    showStatus("Step 1/3: Scraping apartment listing...", "loading");
+    btn.textContent = "🔍 Scraping & Analyzing... (this may take 60-90 sec)";
+    showStatus("Step 1: Scraping apartment listing...", "loading");
 
     try {
         const response = await fetch(`${API_URL}/api/score`, {
@@ -205,88 +205,48 @@ async function scoreFromURL() {
 
         const data = await response.json();
 
-        if (data.status === "success") {
-            showStatus("✅ Scored successfully!", "success");
+        if (data.status === "success" && data.apartments && data.apartments.length > 0) {
+            // Save all matching floor plans
+            data.apartments.forEach(apt => {
+                addApartmentLocal(apt);
+            });
 
-            // Save to local storage
-            const apt = data.apartment;
-            apt.scores = data.scores;
-            addApartmentLocal(apt);
+            showStatus(
+                `✅ Found ${data.total_plans_found} floor plans, ` +
+                `${data.matching_plans} matching 2bd/2ba. Scored!`,
+                "success"
+            );
 
-            // Check if we need manual input for missing fields
-            const missing = [];
-            if (!apt.rent || apt.rent === 0) missing.push("rent");
-            if (!apt.address) missing.push("address");
-            if (!apt.name || apt.name === "Unknown Apartment") missing.push("name");
+            // Open PDP for the first (cheapest) plan
+            setTimeout(() => {
+                const firstApt = data.apartments[0];
+                openPDP(firstApt.id);
+            }, 800);
 
-            if (missing.length > 0) {
-                // Pre-fill what we have and show manual form
-                if (apt.name) document.getElementById("input-name").value = apt.name;
-                if (apt.address) document.getElementById("input-address").value = apt.address;
-                if (apt.rent) document.getElementById("input-rent").value = apt.rent;
-
-                // Check detected amenities
-                document.querySelectorAll('input[name="amenity"]').forEach(cb => {
-                    cb.checked = apt.amenities?.includes(cb.value) || false;
-                });
-
-                showManualForm(
-                    `Scraped some data but couldn't detect: ${missing.join(", ")}. ` +
-                    `Please fill in the missing fields below.`
-                );
-            } else {
-                // All good — go to PDP
-                setTimeout(() => openPDP(apt.id), 500);
-            }
+        } else if (data.status === "scrape_failed" || data.needs_manual) {
+            showStatus("⚠️ Couldn't auto-detect all details. Fill in below:", "error");
+            showManualForm(data.error || "Please enter details manually");
         } else {
-            throw new Error(data.error || "Unknown error");
+            showStatus("⚠️ No matching floor plans found. Try manual entry.", "error");
+            showManualForm("No 2bd/2ba plans detected");
         }
 
     } catch (err) {
         console.error("Score error:", err);
-
         if (err.message.includes("Failed to fetch") || err.message.includes("NetworkError")) {
             showStatus(
-                "⚠️ Can't connect to backend server. Make sure server.py is running locally, " +
-                "or enter details manually below.",
+                "⚠️ Can't connect to backend. It may be waking up — try again in 30 seconds.",
                 "error"
             );
         } else {
-            showStatus(`⚠️ ${err.message}. Try entering details manually.`, "error");
+            showStatus(`⚠️ ${err.message}`, "error");
         }
-
-        showManualForm("Auto-scrape couldn't complete. Enter the details manually:");
+        showManualForm("Auto-scrape couldn't complete");
     }
 
     btn.disabled = false;
     btn.textContent = "Score This Apartment 🎯";
 }
-
-
-function showManualForm(reason) {
-    document.getElementById("manual-section").style.display = "block";
-    document.getElementById("manual-reason").textContent = reason || "";
-}
-
-function showStatus(message, type) {
-    const el = document.getElementById("score-status");
-    el.style.display = "block";
-
-    const colors = {
-        loading: "#0071e3",
-        success: "#248a3d",
-        error: "#d70015"
-    };
-
-    el.innerHTML = `
-        <div style="padding:14px 18px; border-radius:10px; 
-            background:${type === 'loading' ? '#f0f7ff' : type === 'success' ? '#e8f5e9' : '#fff5f5'};
-            color:${colors[type] || '#1d1d1f'}; font-size:14px; font-weight:500;">
-            ${type === 'loading' ? '<span class="spinner"></span> ' : ''}${message}
-        </div>
-    `;
-}
-
 
 // ============================================
 // MANUAL SCORING
