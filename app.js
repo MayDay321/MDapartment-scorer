@@ -1,16 +1,7 @@
-// app.js - Apartment Scorer Frontend (Connected to Backend)
+// app.js - Apartment Scorer Frontend
 
-// ============================================
-// CONFIG - Change this to your backend URL once deployed
-// ============================================
 const API_URL = "https://mdapartment-scorer.onrender.com";
-// After deploying to Render, change to something like:
-// const API_URL = "https://apartment-scorer-xxxx.onrender.com";
 
-
-// ============================================
-// CONSTANTS
-// ============================================
 const USER_SETTINGS = {
     budget_cap: 2500,
     ideal_bedrooms: 2,
@@ -47,7 +38,7 @@ const SCORE_CATEGORIES = [
 
 
 // ============================================
-// LOCAL SCORING (fallback when backend is down)
+// LOCAL SCORING (fallback)
 // ============================================
 
 function scorePrice(rent) {
@@ -61,9 +52,7 @@ function scorePrice(rent) {
 function scoreRooms(beds, baths, sqft) {
     const bedS = Math.max(0, 40 - Math.abs(beds - USER_SETTINGS.ideal_bedrooms) * 20);
     const bathS = Math.max(0, 40 - Math.abs(baths - USER_SETTINGS.ideal_bathrooms) * 20);
-    let sqftS = 0;
-    if (sqft >= USER_SETTINGS.ideal_sqft) sqftS = 20;
-    else if (sqft >= USER_SETTINGS.ideal_sqft * 0.8) sqftS = 10;
+    let sqftS = sqft >= USER_SETTINGS.ideal_sqft ? 20 : (sqft >= USER_SETTINGS.ideal_sqft * 0.8 ? 10 : 0);
     return Math.round(bedS + bathS + sqftS);
 }
 
@@ -82,30 +71,29 @@ function scoreNiceToHaves(amenities) {
 }
 
 function localScoreAll(apt) {
-    const scores = {};
-    scores.price = scorePrice(apt.rent || 0);
-    scores.rooms = scoreRooms(apt.bedrooms || 2, apt.bathrooms || 2, apt.sqft || 0);
-    scores.necessities = scoreNecessities(apt.amenities || []);
-    scores.nice_to_haves = scoreNiceToHaves(apt.amenities || []);
-    scores.schools = apt.scores?.schools ?? 50;
-    scores.crime = apt.scores?.crime ?? 50;
-    scores.restaurants = apt.scores?.restaurants ?? 50;
-    scores.commute = apt.scores?.commute ?? 50;
-    scores.nightlife = apt.scores?.nightlife ?? 50;
-    scores.grocery = apt.scores?.grocery ?? 50;
-    const vals = Object.values(scores);
-    scores.overall = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
-    return scores;
+    const s = {};
+    s.price = scorePrice(apt.rent || 0);
+    s.rooms = scoreRooms(apt.bedrooms || 2, apt.bathrooms || 2, apt.sqft || 0);
+    s.necessities = scoreNecessities(apt.amenities || []);
+    s.nice_to_haves = scoreNiceToHaves(apt.amenities || []);
+    s.schools = apt.scores?.schools ?? 50;
+    s.crime = apt.scores?.crime ?? 50;
+    s.restaurants = apt.scores?.restaurants ?? 50;
+    s.commute = apt.scores?.commute ?? 50;
+    s.nightlife = apt.scores?.nightlife ?? 50;
+    s.grocery = apt.scores?.grocery ?? 50;
+    const vals = Object.values(s);
+    s.overall = Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+    return s;
 }
 
 
 // ============================================
-// DATA STORAGE (localStorage + backend sync)
+// STORAGE
 // ============================================
 
 function getApartments() {
-    const data = localStorage.getItem("apartments");
-    return data ? JSON.parse(data) : [];
+    return JSON.parse(localStorage.getItem("apartments") || "[]");
 }
 
 function saveApartments(apartments) {
@@ -122,9 +110,7 @@ function addApartmentLocal(apartment) {
 }
 
 function deleteApartment(id) {
-    let apartments = getApartments();
-    apartments = apartments.filter(a => a.id !== id);
-    saveApartments(apartments);
+    saveApartments(getApartments().filter(a => a.id !== id));
     renderDashboard();
 }
 
@@ -135,13 +121,14 @@ function updateApartment(id, updates) {
         apartments[idx] = { ...apartments[idx], ...updates };
         apartments[idx].scores = localScoreAll(apartments[idx]);
         saveApartments(apartments);
+        return apartments[idx];
     }
-    return apartments[idx];
+    return null;
 }
 
 
 // ============================================
-// SCORE HELPERS
+// HELPERS
 // ============================================
 
 function getScoreColor(score) {
@@ -156,6 +143,19 @@ function getScoreEmoji(score) {
     return "🔴";
 }
 
+function showStatus(message, type) {
+    const el = document.getElementById("score-status");
+    el.style.display = "block";
+    const colors = { loading: "#0071e3", success: "#248a3d", error: "#d70015" };
+    const bgs = { loading: "#f0f7ff", success: "#e8f5e9", error: "#fff5f5" };
+    el.innerHTML = `<div style="padding:14px 18px; border-radius:10px; background:${bgs[type] || '#f5f5f5'}; color:${colors[type] || '#1d1d1f'}; font-size:14px; font-weight:500;">${message}</div>`;
+}
+
+function showManualForm(reason) {
+    document.getElementById("manual-section").style.display = "block";
+    document.getElementById("manual-reason").textContent = reason || "";
+}
+
 
 // ============================================
 // VIEW MANAGEMENT
@@ -164,35 +164,30 @@ function getScoreEmoji(score) {
 function showView(viewName) {
     document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
     document.getElementById(`${viewName}-view`).classList.add("active");
-
-    document.querySelectorAll(".nav-btn").forEach(btn => btn.classList.remove("active"));
     document.querySelectorAll(".nav-btn").forEach(btn => {
+        btn.classList.remove("active");
         if (btn.textContent.toLowerCase().includes(viewName) ||
             (viewName === "add" && btn.textContent.includes("Add"))) {
             btn.classList.add("active");
         }
     });
-
     if (viewName === "dashboard") renderDashboard();
     if (viewName === "compare") renderCompareSelector();
 }
 
 
 // ============================================
-// URL SCORING (Main Flow!)
+// URL SCORING
 // ============================================
 
 async function scoreFromURL() {
     const url = document.getElementById("input-url").value.trim();
-    if (!url) {
-        showStatus("Please paste a URL first!", "error");
-        return;
-    }
+    if (!url) { showStatus("Please paste a URL first!", "error"); return; }
 
     const btn = document.getElementById("score-btn");
     btn.disabled = true;
-    btn.textContent = "🔍 Scraping & Analyzing... (this may take 60-90 sec)";
-    showStatus("Step 1: Scraping apartment listing...", "loading");
+    btn.textContent = "🔍 Scraping & Analyzing... (up to 60 sec)";
+    showStatus("Scraping apartment listing and fetching neighborhood data...", "loading");
 
     try {
         const response = await fetch(`${API_URL}/api/score`, {
@@ -202,27 +197,12 @@ async function scoreFromURL() {
         });
 
         if (!response.ok) throw new Error(`Server error: ${response.status}`);
-
         const data = await response.json();
 
         if (data.status === "success" && data.apartments && data.apartments.length > 0) {
-            // Save all matching floor plans
-            data.apartments.forEach(apt => {
-                addApartmentLocal(apt);
-            });
-
-            showStatus(
-                `✅ Found ${data.total_plans_found} floor plans, ` +
-                `${data.matching_plans} matching 2bd/2ba. Scored!`,
-                "success"
-            );
-
-            // Open PDP for the first (cheapest) plan
-            setTimeout(() => {
-                const firstApt = data.apartments[0];
-                openPDP(firstApt.id);
-            }, 800);
-
+            data.apartments.forEach(apt => addApartmentLocal(apt));
+            showStatus(`✅ Found ${data.total_plans_found} floor plans, ${data.matching_plans} matching 2bd/2ba. Scored!`, "success");
+            setTimeout(() => openPDP(data.apartments[0].id), 800);
         } else if (data.status === "scrape_failed" || data.needs_manual) {
             showStatus("⚠️ Couldn't auto-detect all details. Fill in below:", "error");
             showManualForm(data.error || "Please enter details manually");
@@ -230,14 +210,10 @@ async function scoreFromURL() {
             showStatus("⚠️ No matching floor plans found. Try manual entry.", "error");
             showManualForm("No 2bd/2ba plans detected");
         }
-
     } catch (err) {
         console.error("Score error:", err);
         if (err.message.includes("Failed to fetch") || err.message.includes("NetworkError")) {
-            showStatus(
-                "⚠️ Can't connect to backend. It may be waking up — try again in 30 seconds.",
-                "error"
-            );
+            showStatus("⚠️ Can't connect to backend. It may be waking up — try again in 30 seconds.", "error");
         } else {
             showStatus(`⚠️ ${err.message}`, "error");
         }
@@ -247,6 +223,7 @@ async function scoreFromURL() {
     btn.disabled = false;
     btn.textContent = "Score This Apartment 🎯";
 }
+
 
 // ============================================
 // MANUAL SCORING
@@ -267,29 +244,22 @@ async function scoreManual() {
         return;
     }
 
-    const amenities = Array.from(
-        document.querySelectorAll('input[name="amenity"]:checked')
-    ).map(cb => cb.value);
-
+    const amenities = Array.from(document.querySelectorAll('input[name="amenity"]:checked')).map(cb => cb.value);
     const apartment = { name, address, url, rent, bedrooms: beds, bathrooms: baths, sqft, amenities, tour_3d: tour };
 
-    // Try backend first for neighborhood data
     try {
         showStatus("🔍 Fetching neighborhood data...", "loading");
-
         const response = await fetch(`${API_URL}/api/score-manual`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(apartment)
         });
-
         if (response.ok) {
             const data = await response.json();
-            const apt = data.apartment;
-            apt.scores = data.scores;
-            addApartmentLocal(apt);
+            data.apartment.scores = data.scores;
+            addApartmentLocal(data.apartment);
             showStatus("✅ Scored!", "success");
-            setTimeout(() => openPDP(apt.id), 500);
+            setTimeout(() => openPDP(data.apartment.id), 500);
             resetAddForm();
             return;
         }
@@ -297,7 +267,6 @@ async function scoreManual() {
         console.log("Backend unavailable, scoring locally");
     }
 
-    // Fallback: score locally without neighborhood data
     const apt = addApartmentLocal(apartment);
     openPDP(apt.id);
     resetAddForm();
@@ -319,7 +288,7 @@ function resetAddForm() {
 
 
 // ============================================
-// DASHBOARD RENDERING
+// DASHBOARD
 // ============================================
 
 function renderDashboard() {
@@ -333,17 +302,13 @@ function renderDashboard() {
                 <h3>No apartments yet</h3>
                 <p>Paste an apartment URL to start scoring and comparing.</p>
                 <button onclick="showView('add')">+ Add Apartment</button>
-            </div>
-        `;
+            </div>`;
         return;
     }
 
     grid.innerHTML = apartments.map(apt => {
         const scores = apt.scores || localScoreAll(apt);
         const color = getScoreColor(scores.overall);
-        const topCats = SCORE_CATEGORIES.slice(0, 5);
-        const bottomCats = SCORE_CATEGORIES.slice(5);
-
         return `
             <div class="apartment-card" onclick="openPDP('${apt.id}')">
                 <div class="card-header">
@@ -358,32 +323,27 @@ function renderDashboard() {
                 <div class="card-details">
                     <span>💰 $${(apt.rent || 0).toLocaleString()}/mo</span>
                     <span>🛏️ ${apt.bedrooms || '?'}bd/${apt.bathrooms || '?'}ba</span>
-                    <span>📐 ${apt.sqft ? apt.sqft.toLocaleString() + ' sqft' : '? sqft'}</span>
+                    <span>📐 ${apt.sqft ? apt.sqft.toLocaleString() + ' sqft' : '?'}</span>
                 </div>
                 <div class="card-scores">
-                    ${topCats.map(cat => `
+                    ${SCORE_CATEGORIES.slice(0, 5).map(cat => `
                         <div class="mini-score">
                             <span class="mini-score-label">${cat.icon}</span>
                             <span class="mini-score-value text-${getScoreColor(scores[cat.key] || 0)}">${scores[cat.key] || 0}</span>
-                        </div>
-                    `).join("")}
+                        </div>`).join("")}
                 </div>
                 <div class="card-scores">
-                    ${bottomCats.map(cat => `
+                    ${SCORE_CATEGORIES.slice(5).map(cat => `
                         <div class="mini-score">
                             <span class="mini-score-label">${cat.icon}</span>
                             <span class="mini-score-value text-${getScoreColor(scores[cat.key] || 0)}">${scores[cat.key] || 0}</span>
-                        </div>
-                    `).join("")}
+                        </div>`).join("")}
                 </div>
                 <div style="padding:0 20px 12px; text-align:right;">
-                    <button onclick="event.stopPropagation(); deleteApartment('${apt.id}')" 
-                            style="background:none; border:none; color:#d70015; font-size:12px; cursor:pointer;">
-                        Delete
-                    </button>
+                    <button onclick="event.stopPropagation(); deleteApartment('${apt.id}')"
+                            style="background:none; border:none; color:#d70015; font-size:12px; cursor:pointer;">Delete</button>
                 </div>
-            </div>
-        `;
+            </div>`;
     }).join("");
 }
 
@@ -395,31 +355,24 @@ function renderDashboard() {
 function sortApartments() {
     const sortBy = document.getElementById("sort-select").value;
     let apartments = getApartments();
-
-    if (sortBy === "rent") {
-        apartments.sort((a, b) => (a.rent || 0) - (b.rent || 0));
-    } else {
-        apartments.sort((a, b) => ((b.scores || {})[sortBy] || 0) - ((a.scores || {})[sortBy] || 0));
-    }
-
+    if (sortBy === "rent") apartments.sort((a, b) => (a.rent || 0) - (b.rent || 0));
+    else apartments.sort((a, b) => ((b.scores || {})[sortBy] || 0) - ((a.scores || {})[sortBy] || 0));
     saveApartments(apartments);
     renderDashboard();
 }
 
 
 // ============================================
-// PDP RENDERING
+// PDP
 // ============================================
 
 function openPDP(id) {
-    const apartments = getApartments();
-    const apt = apartments.find(a => a.id === id);
+    const apt = getApartments().find(a => a.id === id);
     if (!apt) return;
 
     const scores = apt.scores || localScoreAll(apt);
     const color = getScoreColor(scores.overall);
 
-    // Header
     document.getElementById("pdp-name").textContent = apt.name || "Unknown";
     document.getElementById("pdp-address").textContent = apt.address || "No address";
 
@@ -427,47 +380,39 @@ function openPDP(id) {
     if (apt.url) { urlEl.href = apt.url; urlEl.style.display = "inline"; }
     else { urlEl.style.display = "none"; }
 
-    // Overall score
     const circle = document.getElementById("pdp-score-circle");
     circle.className = `score-circle large score-${color}`;
     document.getElementById("pdp-overall-number").textContent = scores.overall;
 
-    // Details bar
     document.getElementById("pdp-rent").textContent = apt.rent ? `$${apt.rent.toLocaleString()}/mo` : "—";
     document.getElementById("pdp-layout").textContent = `${apt.bedrooms || '?'}bd / ${apt.bathrooms || '?'}ba`;
     document.getElementById("pdp-sqft").textContent = apt.sqft ? `${apt.sqft.toLocaleString()} sqft` : "—";
 
-    const commuteMin = apt.neighborhood_data?.commute_minutes || apt.scores?.commute_minutes;
+    const commuteMin = apt.neighborhood_data?.commute_minutes;
     document.getElementById("pdp-commute-time").textContent = commuteMin ? `${commuteMin} min` : "—";
 
-    // Score bars
     document.getElementById("pdp-score-bars").innerHTML = SCORE_CATEGORIES.map(cat => {
         const score = scores[cat.key] || 0;
-        const barColor = getScoreColor(score);
         return `
             <div class="score-bar-row">
                 <span class="score-bar-label">${cat.icon} ${cat.label}</span>
                 <div class="score-bar-track">
-                    <div class="score-bar-fill ${barColor}" style="width: ${score}%"></div>
+                    <div class="score-bar-fill ${getScoreColor(score)}" style="width: ${score}%"></div>
                 </div>
-                <span class="score-bar-value text-${barColor}">${score}</span>
-            </div>
-        `;
+                <span class="score-bar-value text-${getScoreColor(score)}">${score}</span>
+            </div>`;
     }).join("");
 
-    // Amenities - Necessities
     document.getElementById("pdp-necessities").innerHTML = USER_SETTINGS.necessities.map(key => {
         const has = (apt.amenities || []).includes(key);
         return `<li class="${has ? 'has-it' : 'missing'}">${has ? '✅' : '❌'} ${AMENITY_LABELS[key]}</li>`;
     }).join("");
 
-    // Amenities - Nice to haves
     document.getElementById("pdp-nice-to-haves").innerHTML = USER_SETTINGS.nice_to_haves.map(key => {
         const has = (apt.amenities || []).includes(key);
         return `<li class="${has ? 'has-it' : 'missing'}">${has ? '✅' : '❌'} ${AMENITY_LABELS[key]}</li>`;
     }).join("");
 
-    // 3D Tour
     const tourSection = document.getElementById("pdp-tour-section");
     if (apt.tour_3d) {
         tourSection.style.display = "block";
@@ -476,7 +421,6 @@ function openPDP(id) {
         tourSection.style.display = "none";
     }
 
-    // Neighborhood highlights
     document.getElementById("pdp-neighborhood-details").innerHTML = SCORE_CATEGORIES.filter(c =>
         ["schools", "crime", "restaurants", "commute", "nightlife", "grocery"].includes(c.key)
     ).map(cat => {
@@ -486,36 +430,29 @@ function openPDP(id) {
                 <span class="nh-icon">${cat.icon}</span>
                 <span class="nh-label">${cat.label}</span>
                 <span class="nh-value text-${getScoreColor(score)}">${score}/100</span>
-            </div>
-        `;
+            </div>`;
     }).join("");
 
-    // Edit form
     document.getElementById("pdp-edit-form").innerHTML = `
         <div class="form-row" style="margin-bottom:16px;">
             <div class="form-group">
                 <label>Rent ($)</label>
-                <input type="number" id="edit-rent" value="${apt.rent || ''}" 
-                       onchange="updateField('${apt.id}', 'rent', this.value)">
+                <input type="number" value="${apt.rent || ''}" onchange="updateField('${apt.id}', 'rent', this.value)">
             </div>
             <div class="form-group">
                 <label>Bedrooms</label>
-                <input type="number" id="edit-beds" value="${apt.bedrooms || 2}" 
-                       onchange="updateField('${apt.id}', 'bedrooms', this.value)">
+                <input type="number" value="${apt.bedrooms || 2}" onchange="updateField('${apt.id}', 'bedrooms', this.value)">
             </div>
             <div class="form-group">
                 <label>Bathrooms</label>
-                <input type="number" id="edit-baths" value="${apt.bathrooms || 2}" 
-                       onchange="updateField('${apt.id}', 'bathrooms', this.value)">
+                <input type="number" value="${apt.bathrooms || 2}" onchange="updateField('${apt.id}', 'bathrooms', this.value)">
             </div>
             <div class="form-group">
                 <label>Sq Ft</label>
-                <input type="number" id="edit-sqft" value="${apt.sqft || ''}" 
-                       onchange="updateField('${apt.id}', 'sqft', this.value)">
+                <input type="number" value="${apt.sqft || ''}" onchange="updateField('${apt.id}', 'sqft', this.value)">
             </div>
         </div>
-        <p style="color:#6e6e73; font-size:12px;">Changes auto-save and re-score</p>
-    `;
+        <p style="color:#6e6e73; font-size:12px;">Changes auto-save and re-score</p>`;
 
     showView("pdp");
 }
@@ -524,75 +461,60 @@ function updateField(id, field, value) {
     const updates = {};
     updates[field] = parseInt(value) || 0;
     const apt = updateApartment(id, updates);
-    if (apt) openPDP(id); // Re-render PDP with new scores
+    if (apt) openPDP(id);
 }
 
 
 // ============================================
-// COMPARE VIEW
+// COMPARE
 // ============================================
 
 function renderCompareSelector() {
     const apartments = getApartments();
     const container = document.getElementById("compare-checkboxes");
-
     if (apartments.length < 2) {
         container.innerHTML = `<p>Add at least 2 apartments to compare.</p>`;
         return;
     }
-
-    container.innerHTML = apartments.map(apt => `
-        <label><input type="checkbox" value="${apt.id}"> ${apt.name || 'Unknown'}</label>
-    `).join("");
+    container.innerHTML = apartments.map(apt =>
+        `<label><input type="checkbox" value="${apt.id}"> ${apt.name || 'Unknown'}</label>`
+    ).join("");
 }
 
 function runComparison() {
-    const checkboxes = document.querySelectorAll("#compare-checkboxes input:checked");
-    const selectedIds = Array.from(checkboxes).map(cb => cb.value);
+    const selectedIds = Array.from(document.querySelectorAll("#compare-checkboxes input:checked")).map(cb => cb.value);
+    if (selectedIds.length < 2) { alert("Select at least 2 apartments."); return; }
 
-    if (selectedIds.length < 2) {
-        alert("Please select at least 2 apartments to compare.");
-        return;
-    }
-
-    const apartments = getApartments();
-    const selected = apartments.filter(a => selectedIds.includes(a.id));
+    const selected = getApartments().filter(a => selectedIds.includes(a.id));
     const container = document.getElementById("compare-table-container");
-
     const headers = selected.map(a => `<th>${a.name || 'Unknown'}</th>`).join("");
 
     function getBestIds(key) {
-        let max = -Infinity;
-        let best = [];
+        let max = -Infinity, best = [];
         selected.forEach(a => {
             const val = key === "rent" ? -(a.rent || 0) : ((a.scores || {})[key] || 0);
             if (val > max) { max = val; best = [a.id]; }
-            else if (val === max) { best.push(a.id); }
+            else if (val === max) best.push(a.id);
         });
         return best;
     }
 
     const rows = [];
-
-    // Overall
-    const overallBest = getBestIds("overall");
+    const ob = getBestIds("overall");
     rows.push(`<tr><td><strong>Overall Score</strong></td>${selected.map(a => {
         const s = (a.scores || {}).overall || 0;
-        return `<td class="${overallBest.includes(a.id) ? 'best-score' : ''}"><strong>${s}/100</strong> ${getScoreEmoji(s)}</td>`;
+        return `<td class="${ob.includes(a.id) ? 'best-score' : ''}"><strong>${s}/100</strong> ${getScoreEmoji(s)}</td>`;
     }).join("")}</tr>`);
 
-    // Rent
-    const rentBest = getBestIds("rent");
+    const rb = getBestIds("rent");
     rows.push(`<tr><td>Rent</td>${selected.map(a =>
-        `<td class="${rentBest.includes(a.id) ? 'best-score' : ''}">$${(a.rent || 0).toLocaleString()}/mo</td>`
+        `<td class="${rb.includes(a.id) ? 'best-score' : ''}">$${(a.rent || 0).toLocaleString()}/mo</td>`
     ).join("")}</tr>`);
 
-    // Layout
     rows.push(`<tr><td>Layout</td>${selected.map(a =>
         `<td>${a.bedrooms || '?'}bd/${a.bathrooms || '?'}ba • ${a.sqft ? a.sqft.toLocaleString() + ' sqft' : '?'}</td>`
     ).join("")}</tr>`);
 
-    // Each score
     SCORE_CATEGORIES.forEach(cat => {
         const best = getBestIds(cat.key);
         rows.push(`<tr><td>${cat.icon} ${cat.label}</td>${selected.map(a => {
@@ -601,29 +523,24 @@ function runComparison() {
         }).join("")}</tr>`);
     });
 
-    // Necessities
     rows.push(`<tr><td>All Necessities?</td>${selected.map(a =>
         `<td>${(a.scores || {}).necessities === 100 ? '✅ Yes' : '❌ No'}</td>`
     ).join("")}</tr>`);
 
-    // Tour
     rows.push(`<tr><td>3D Tour</td>${selected.map(a =>
-        `<td>${a.tour_3d ? `<a href="${a.tour_3d}" target="_blank" style="color:#0071e3;">View Tour</a>` : '—'}</td>`
+        `<td>${a.tour_3d ? `<a href="${a.tour_3d}" target="_blank" style="color:#0071e3;">View</a>` : '—'}</td>`
     ).join("")}</tr>`);
 
     container.innerHTML = `
         <table class="compare-table">
             <thead><tr><th>Category</th>${headers}</tr></thead>
             <tbody>${rows.join("")}</tbody>
-        </table>
-    `;
+        </table>`;
 }
 
 
 // ============================================
-// INITIALIZE
+// INIT
 // ============================================
 
-document.addEventListener("DOMContentLoaded", () => {
-    renderDashboard();
-});
+document.addEventListener("DOMContentLoaded", () => renderDashboard());
