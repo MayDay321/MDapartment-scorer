@@ -227,6 +227,7 @@ async function scoreFromSource() {
     btn.disabled = false;
     btn.textContent = "Score This Apartment 🎯";
 }
+
 // ============================================
 // URL SCORING
 // ============================================
@@ -414,7 +415,7 @@ function sortApartments() {
 
 
 // ============================================
-// PDP
+// PDP (FIXED)
 // ============================================
 
 function openPDP(id) {
@@ -442,6 +443,7 @@ function openPDP(id) {
     const commuteMin = apt.neighborhood_data?.commute_minutes;
     document.getElementById("pdp-commute-time").textContent = commuteMin ? `${commuteMin} min` : "—";
 
+    // Score bars
     document.getElementById("pdp-score-bars").innerHTML = SCORE_CATEGORIES.map(cat => {
         const score = scores[cat.key] || 0;
         return `
@@ -454,6 +456,7 @@ function openPDP(id) {
             </div>`;
     }).join("");
 
+    // Amenities
     document.getElementById("pdp-necessities").innerHTML = USER_SETTINGS.necessities.map(key => {
         const has = (apt.amenities || []).includes(key);
         return `<li class="${has ? 'has-it' : 'missing'}">${has ? '✅' : '❌'} ${AMENITY_LABELS[key]}</li>`;
@@ -464,6 +467,7 @@ function openPDP(id) {
         return `<li class="${has ? 'has-it' : 'missing'}">${has ? '✅' : '❌'} ${AMENITY_LABELS[key]}</li>`;
     }).join("");
 
+    // Tour
     const tourSection = document.getElementById("pdp-tour-section");
     if (apt.tour_3d) {
         tourSection.style.display = "block";
@@ -472,17 +476,19 @@ function openPDP(id) {
         tourSection.style.display = "none";
     }
 
-// Neighborhood highlights with details
+    // ---- NEIGHBORHOOD SECTION (consolidated fix) ----
     const nhData = apt.neighborhood_data || {};
-    
-    document.getElementById("pdp-neighborhood-details").innerHTML = SCORE_CATEGORIES.filter(c =>
+    let nhHTML = "";
+
+    // Neighborhood score cards
+    nhHTML += SCORE_CATEGORIES.filter(c =>
         ["schools", "crime", "restaurants", "commute", "nightlife", "grocery"].includes(c.key)
     ).map(cat => {
         const score = scores[cat.key] || 0;
         let details = "";
 
         if (cat.key === "grocery" && nhData.grocery_stores) {
-            details = nhData.grocery_stores.slice(0, 5).map(g => 
+            details = nhData.grocery_stores.slice(0, 5).map(g =>
                 `<span style="font-size:12px; color:#6e6e73; display:block;">${g.name} — ${g.distance_miles} mi</span>`
             ).join("");
             if (nhData.costco_distance) {
@@ -521,50 +527,45 @@ function openPDP(id) {
             </div>`;
     }).join("");
 
-    document.getElementById("pdp-neighborhood-details").innerHTML = nhHTML;
-
-    // Add nearby places details below neighborhood cards
-    let placesHTML = "";
-
+    // Nearby places detail lists
     const groceryStores = nhData.grocery_stores || [];
     if (groceryStores.length > 0) {
-        placesHTML += `<div style="margin-top:20px;"><h4 style="margin-bottom:8px;">🛒 Nearby Grocery</h4>`;
-        placesHTML += groceryStores.slice(0, 8).map(g =>
+        nhHTML += `<div style="grid-column: 1 / -1; margin-top:20px;"><h4 style="margin-bottom:8px;">🛒 Nearby Grocery</h4>`;
+        nhHTML += groceryStores.slice(0, 8).map(g =>
             `<span style="display:inline-block; background:#f5f5f7; padding:6px 12px; border-radius:8px; margin:4px; font-size:13px;">${g.name} (${g.distance_miles} mi)</span>`
         ).join("");
         if (nhData.has_costco) {
-            placesHTML += `<p style="color:#248a3d; font-size:13px; margin-top:8px;">🎯 Costco: ${nhData.costco_distance} miles away</p>`;
+            nhHTML += `<p style="color:#248a3d; font-size:13px; margin-top:8px;">🎯 Costco: ${nhData.costco_distance} miles away</p>`;
         }
-        placesHTML += `</div>`;
+        nhHTML += `</div>`;
     }
 
     const restaurants = nhData.restaurants_nearby || [];
     if (restaurants.length > 0) {
-        placesHTML += `<div style="margin-top:16px;"><h4 style="margin-bottom:8px;">🍽️ Nearby Restaurants</h4>`;
-        placesHTML += restaurants.slice(0, 8).map(r =>
+        nhHTML += `<div style="grid-column: 1 / -1; margin-top:16px;"><h4 style="margin-bottom:8px;">🍽️ Nearby Restaurants</h4>`;
+        nhHTML += restaurants.slice(0, 8).map(r =>
             `<span style="display:inline-block; background:#f5f5f7; padding:6px 12px; border-radius:8px; margin:4px; font-size:13px;">${r.name} (${r.distance_miles} mi)</span>`
         ).join("");
-        placesHTML += `</div>`;
+        nhHTML += `</div>`;
     }
 
     const nightlife = nhData.nightlife_nearby || [];
     if (nightlife.length > 0) {
-        placesHTML += `<div style="margin-top:16px;"><h4 style="margin-bottom:8px;">🎶 Nearby Nightlife</h4>`;
-        placesHTML += nightlife.slice(0, 8).map(n =>
+        nhHTML += `<div style="grid-column: 1 / -1; margin-top:16px;"><h4 style="margin-bottom:8px;">🎶 Nearby Nightlife</h4>`;
+        nhHTML += nightlife.slice(0, 8).map(n =>
             `<span style="display:inline-block; background:#f5f5f7; padding:6px 12px; border-radius:8px; margin:4px; font-size:13px;">${n.name} (${n.distance_miles} mi)</span>`
         ).join("");
-        placesHTML += `</div>`;
+        nhHTML += `</div>`;
     }
 
     if (nhData.commute_minutes) {
-        placesHTML += `<div style="margin-top:16px;"><h4 style="margin-bottom:8px;">🚗 Commute</h4>`;
-        placesHTML += `<p style="font-size:14px;">Estimated ${nhData.commute_minutes} min drive to Hopkins</p></div>`;
+        nhHTML += `<div style="grid-column: 1 / -1; margin-top:16px;"><h4 style="margin-bottom:8px;">🚗 Commute</h4>`;
+        nhHTML += `<p style="font-size:14px;">Estimated ${nhData.commute_minutes} min drive to Hopkins</p></div>`;
     }
 
-    if (placesHTML) {
-        document.getElementById("pdp-neighborhood-details").innerHTML += placesHTML;
-    }
+    document.getElementById("pdp-neighborhood-details").innerHTML = nhHTML;
 
+    // Edit form
     document.getElementById("pdp-edit-form").innerHTML = `
         <div class="form-row" style="margin-bottom:16px;">
             <div class="form-group">
