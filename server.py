@@ -515,6 +515,9 @@ def overpass_wholesale(lat, lon):
 def fetch_neighborhood(lat, lon):
     """Fetch all neighborhood data with 2 API calls."""
     results = {
+        results["restaurants_nearby"] = sorted(restaurants, key=lambda x: x["distance_miles"])[:15]
+    results["nightlife_nearby"] = sorted(bars, key=lambda x: x["distance_miles"])[:15]
+    results["schools_nearby"] = sorted(schools, key=lambda x: x["distance_miles"])[:10]
         "restaurant_count": 0, "grocery_stores": [], "has_costco": False,
         "costco_distance": None, "nightlife_count": 0, "transit_count": 0,
         "transit_level": "none", "school_count": 0, "commute_minutes": 0
