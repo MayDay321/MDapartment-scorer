@@ -540,6 +540,7 @@ def fetch_neighborhood(lat, lon):
 # ============================================
 
 def score_price(rent):
+    rent = rent or 0
     cap = USER_SETTINGS["budget_cap"]
     avg = USER_SETTINGS["market_avg_rent"]
     budget = 50 if rent <= cap else max(0, 50 - ((rent - cap) / 100) * 10)
@@ -547,6 +548,9 @@ def score_price(rent):
     return round(budget + market)
 
 def score_rooms(beds, baths, sqft):
+    beds = beds or 0
+    baths = baths or 0
+    sqft = sqft or 0
     bed_score = max(0, 40 - abs(beds - USER_SETTINGS["ideal_bedrooms"]) * 20)
     bath_score = max(0, 40 - abs(baths - USER_SETTINGS["ideal_bathrooms"]) * 20)
     sqft_score = 20 if sqft >= USER_SETTINGS["ideal_sqft"] else (10 if sqft >= USER_SETTINGS["ideal_sqft"] * 0.8 else 0)
@@ -596,8 +600,8 @@ def score_schools(count):
 
 def calculate_all_scores(apt, nbr):
     s = {}
-    s["price"] = score_price(apt.get("rent", 0))
-    s["rooms"] = score_rooms(apt.get("bedrooms", 2), apt.get("bathrooms", 2), apt.get("sqft", 0))
+    s["price"] = score_price(apt.get("rent") or 0)
+    s["rooms"] = score_rooms(apt.get("bedrooms") or 2, apt.get("bathrooms") or 2, apt.get("sqft") or 0)
     s["necessities"] = score_necessities(apt.get("amenities", []))
     s["nice_to_haves"] = score_nice_to_haves(apt.get("amenities", []))
     s["schools"] = score_schools(nbr.get("school_count", 0))
