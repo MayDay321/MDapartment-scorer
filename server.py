@@ -52,7 +52,6 @@ AMENITY_KEYWORDS = {
 def scrape_apartments_com(url):
     """Scrape an apartments.com listing page."""
     
-    # Try multiple user agents
     user_agents = [
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
@@ -97,22 +96,14 @@ def scrape_apartments_com(url):
         "tour_3d": None
     }
 
-    # 1. PROPERTY NAME
     name_el = soup.select_one("h1#propertyName") or soup.select_one("h1.propertyName")
     if name_el:
         data["name"] = name_el.text.strip()
 
-    # 2. ADDRESS
     data["address"] = extract_address_adc(soup)
-
-    # 3. FLOOR PLANS
     data["floor_plans"] = extract_floor_plans_adc(soup)
-
-    # 4. AMENITIES
     data["amenities_raw"] = extract_amenities_adc(soup)
     data["amenities_classified"] = classify_amenities_adc(data["amenities_raw"], page_text_lower)
-
-    # 5. 3D TOUR
     data["tour_3d"] = extract_tour_adc(soup)
 
     return data
@@ -125,17 +116,14 @@ def extract_address_adc(soup):
     state = ""
     zipcode = ""
 
-    # Street address
     street_el = soup.select_one("span.delivery-address")
     if street_el:
         street = street_el.text.strip().rstrip(",").strip()
 
-    # City, State, Zip from the address container
     addr_container = soup.select_one("div.propertyAddressContainer")
     if addr_container:
         h2 = addr_container.find("h2")
         if h2:
-            # Get all direct text and spans
             all_spans = h2.find_all("span")
             for span in all_spans:
                 cls = " ".join(span.get("class", []))
@@ -156,16 +144,13 @@ def extract_address_adc(soup):
                 elif text and not city and text != street:
                     city = text
 
-    # If we still don't have city, try neighborhoodAddress
     if not city:
         neighborhood = soup.select_one("span.neighborhoodAddress")
         if neighborhood:
-            # Often contains "Edina" or similar
             text = neighborhood.text.strip().rstrip(",").strip()
             if text:
                 city = text.split(",")[0].strip()
 
-    # Build full address
     parts = []
     if street:
         parts.append(street)
@@ -185,7 +170,6 @@ def extract_floor_plans_adc(soup):
     """Extract all floor plans from apartments.com pricing grid."""
     plans = []
 
-    # Each floor plan is in a priceGridModelWrapper
     wrappers = soup.select("div.priceGridModelWrapper")
 
     for wrapper in wrappers:
@@ -200,15 +184,12 @@ def extract_floor_plans_adc(soup):
             "units": []
         }
 
-        # Rental key
         plan["rental_key"] = wrapper.get("data-rentalkey")
 
-        # Model/Plan name
         model_name = wrapper.select_one("span.modelName")
         if model_name:
             plan["plan_name"] = model_name.text.strip()
 
-        # Rent
         rent_label = wrapper.select_one("span.rentLabel")
         if rent_label:
             rent_text = rent_label.get_text(separator=" ").strip()
@@ -216,7 +197,6 @@ def extract_floor_plans_adc(soup):
             if rent_match:
                 plan["rent"] = int(rent_match.group(1).replace(",", ""))
 
-        # Details (beds, baths, sqft, deposit)
         details = wrapper.select_one("span.detailsTextWrapper")
         if details:
             spans = details.find_all("span")
@@ -240,7 +220,6 @@ def extract_floor_plans_adc(soup):
                 if deposit_match:
                     plan["deposit"] = int(deposit_match.group(1).replace(",", ""))
 
-        # If details wrapper didn't have beds/baths, try detailsLabel
         if not plan["bedrooms"]:
             details_label = wrapper.select_one("span.detailsLabel")
             if details_label:
@@ -256,24 +235,20 @@ def extract_floor_plans_adc(soup):
                 if sqft_match:
                     plan["sqft"] = int(sqft_match.group(1).replace(",", ""))
 
-        # Also check for individual unit rows within this plan
         unit_rows = wrapper.select("li.unitContainer") or wrapper.select("div.unitContainer")
         for unit_row in unit_rows:
             unit = {"unit_number": None, "rent": None, "sqft": None, "available": None}
 
             unit_text = unit_row.get_text(separator=" ").strip()
 
-            # Unit number
             unit_num = unit_row.select_one("span.unitColumn") or unit_row.select_one("button.unitBtn")
             if unit_num:
                 unit["unit_number"] = unit_num.text.strip()
 
-            # Rent for this specific unit
             unit_rent = re.search(r'\$([\d,]+)', unit_text)
             if unit_rent:
                 unit["rent"] = int(unit_rent.group(1).replace(",", ""))
 
-            # Availability
             avail = unit_row.select_one("span.availableDate") or unit_row.select_one("span.dateAvailable")
             if avail:
                 unit["available"] = avail.text.strip()
@@ -281,17 +256,14 @@ def extract_floor_plans_adc(soup):
             if unit["rent"]:
                 plan["units"].append(unit)
 
-        # If no rent from main label, try from units
         if not plan["rent"] and plan["units"]:
             rents = [u["rent"] for u in plan["units"] if u["rent"]]
             if rents:
                 plan["rent"] = min(rents)
 
-        # Only add plans that have at least beds info
         if plan["bedrooms"] is not None or plan["rent"] is not None:
             plans.append(plan)
 
-    # Also try JSON data embedded in page
     if not plans:
         plans = extract_plans_from_json(soup)
 
@@ -305,7 +277,6 @@ def extract_plans_from_json(soup):
     for script in scripts:
         text = script.string or ""
         if "MinTotalMonthlyPrice" in text or "MaxTotalMonthlyPrice" in text:
-            # Try to parse rental data
             try:
                 matches = re.findall(
                     r'"ModelName":"([^"]*)".*?"Beds":(\d+).*?"Baths":([\d.]+).*?"MinSquareFeet":(\d+).*?"MinTotalMonthlyPrice":([\d.]+)',
@@ -329,13 +300,11 @@ def extract_amenities_adc(soup):
     """Extract amenity list from apartments.com."""
     amenities = []
 
-    # Primary: uniqueAmenity items
     for li in soup.select("li.specInfo.uniqueAmenity"):
         span = li.find("span")
         if span:
             amenities.append(span.text.strip())
 
-    # Also check other amenity sections
     for li in soup.select("li.specInfo"):
         span = li.find("span")
         if span:
@@ -343,7 +312,6 @@ def extract_amenities_adc(soup):
             if text and text not in amenities:
                 amenities.append(text)
 
-    # Check for "In-Unit Features" or similar sections
     for section in soup.select("div.specList"):
         for li in section.find_all("li"):
             text = li.get_text(separator=" ").strip()
@@ -367,7 +335,6 @@ def classify_amenities_adc(raw_amenities, page_text=""):
 
 def extract_tour_adc(soup):
     """Find 3D tour or virtual tour links."""
-    # Look for tour buttons/links
     for link in soup.find_all("a", href=True):
         href = link["href"].lower()
         text = link.get_text().lower()
@@ -376,13 +343,11 @@ def extract_tour_adc(soup):
         if any(kw in text for kw in ["3d tour", "virtual tour", "take a tour"]):
             return link["href"]
 
-    # Check for tour iframes
     for iframe in soup.find_all("iframe", src=True):
         src = iframe["src"].lower()
         if any(kw in src for kw in ["matterport", "tour", "3d"]):
             return iframe["src"]
 
-    # Check for tour buttons
     for btn in soup.select("button"):
         text = btn.get_text().lower()
         if "tour" in text or "3d" in text:
@@ -412,7 +377,6 @@ def scrape_generic(url):
         page_text = soup.get_text(separator=" ")
         page_text_lower = page_text.lower()
 
-        # Try to extract basic info
         name = None
         title = soup.find("title")
         if title:
@@ -515,12 +479,10 @@ def overpass_wholesale(lat, lon):
 def fetch_neighborhood(lat, lon):
     """Fetch all neighborhood data with 2 API calls."""
     results = {
-        results["restaurants_nearby"] = sorted(restaurants, key=lambda x: x["distance_miles"])[:15]
-    results["nightlife_nearby"] = sorted(bars, key=lambda x: x["distance_miles"])[:15]
-    results["schools_nearby"] = sorted(schools, key=lambda x: x["distance_miles"])[:10]
         "restaurant_count": 0, "grocery_stores": [], "has_costco": False,
         "costco_distance": None, "nightlife_count": 0, "transit_count": 0,
-        "transit_level": "none", "school_count": 0, "commute_minutes": 0
+        "transit_level": "none", "school_count": 0, "commute_minutes": 0,
+        "restaurants_nearby": [], "nightlife_nearby": [], "schools_nearby": []
     }
 
     elements = overpass_combined(lat, lon)
@@ -568,6 +530,7 @@ def fetch_neighborhood(lat, lon):
     results["commute_minutes"] = round((commute_miles * 1.4 / 25) * 60)
     results["restaurants_nearby"] = sorted(restaurants, key=lambda x: x["distance_miles"])[:15]
     results["nightlife_nearby"] = sorted(bars, key=lambda x: x["distance_miles"])[:15]
+    results["schools_nearby"] = sorted(schools, key=lambda x: x["distance_miles"])[:10]
 
     return results
 
@@ -664,7 +627,6 @@ def score_from_url():
     if not scraped.get("scraped"):
         return jsonify({"status": "scrape_failed", "error": scraped.get("error", "Could not scrape"), "needs_manual": True})
 
-    # Filter to 2bd/2ba plans
     all_plans = scraped.get("floor_plans", [])
     matching = [p for p in all_plans if p.get("bedrooms") == 2 and p.get("bathrooms") == 2]
     if not matching:
@@ -672,7 +634,6 @@ def score_from_url():
     if not matching:
         matching = all_plans
 
-    # Geocode + neighborhood (once)
     neighborhood = {}
     address = scraped.get("address", "")
     coords = None
@@ -681,7 +642,6 @@ def score_from_url():
         if coords:
             neighborhood = fetch_neighborhood(coords["lat"], coords["lon"])
 
-    # Score each matching plan
     scored_plans = []
     for i, plan in enumerate(matching):
         rent = plan.get("rent", 0)
@@ -743,7 +703,6 @@ def score_from_source():
     soup = BeautifulSoup(source, "html.parser")
     page_text_lower = soup.get_text(separator=" ").lower()
 
-    # Parse using apartments.com selectors
     name = None
     name_el = soup.select_one("h1#propertyName") or soup.select_one("h1.propertyName")
     if name_el:
@@ -758,14 +717,12 @@ def score_from_source():
     if not floor_plans:
         return jsonify({"status": "no_plans", "error": "No floor plans found"})
 
-    # Filter to 2bd/2ba
     matching = [p for p in floor_plans if p.get("bedrooms") == 2 and p.get("bathrooms") == 2]
     if not matching:
         matching = [p for p in floor_plans if p.get("bedrooms") == 2]
     if not matching:
         matching = floor_plans
 
-    # Geocode + neighborhood
     neighborhood = {}
     coords = None
     if address:
@@ -819,6 +776,7 @@ def score_from_source():
             "tour_found": tour is not None
         }
     })
+
 @app.route("/api/score-manual", methods=["POST"])
 def score_manual():
     body = request.json
