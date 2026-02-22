@@ -563,6 +563,8 @@ def fetch_neighborhood(lat, lon):
 
     commute_miles = haversine_miles(lat, lon, USER_SETTINGS["commute_target"]["lat"], USER_SETTINGS["commute_target"]["lon"])
     results["commute_minutes"] = round((commute_miles * 1.4 / 25) * 60)
+    results["restaurants_nearby"] = sorted(restaurants, key=lambda x: x["distance_miles"])[:15]
+    results["nightlife_nearby"] = sorted(bars, key=lambda x: x["distance_miles"])[:15]
 
     return results
 
