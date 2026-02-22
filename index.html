@@ -8,7 +8,6 @@
 </head>
 <body>
 
-    <!-- TOP NAV -->
     <nav class="top-nav">
         <div class="nav-content">
             <h1 class="logo">🏢 ApartmentScorer</h1>
@@ -20,7 +19,7 @@
         </div>
     </nav>
 
-    <!-- DASHBOARD VIEW -->
+    <!-- DASHBOARD -->
     <div id="dashboard-view" class="view active">
         <div class="dashboard-header">
             <h2>Your Apartments</h2>
@@ -45,7 +44,7 @@
         <div id="apartment-grid" class="apartment-grid"></div>
     </div>
 
-    <!-- PDP VIEW -->
+    <!-- PDP -->
     <div id="pdp-view" class="view">
         <button class="back-btn" onclick="showView('dashboard')">← Back to All Apartments</button>
         <div class="pdp-container">
@@ -62,56 +61,25 @@
                     <p class="score-label">Overall Score</p>
                 </div>
             </div>
-
             <div class="pdp-details-bar">
-                <div class="detail-item">
-                    <span class="detail-label">Rent</span>
-                    <span id="pdp-rent" class="detail-value"></span>
-                </div>
-                <div class="detail-item">
-                    <span class="detail-label">Layout</span>
-                    <span id="pdp-layout" class="detail-value"></span>
-                </div>
-                <div class="detail-item">
-                    <span class="detail-label">Sq Ft</span>
-                    <span id="pdp-sqft" class="detail-value"></span>
-                </div>
-                <div class="detail-item">
-                    <span class="detail-label">Commute</span>
-                    <span id="pdp-commute-time" class="detail-value"></span>
-                </div>
+                <div class="detail-item"><span class="detail-label">Rent</span><span id="pdp-rent" class="detail-value"></span></div>
+                <div class="detail-item"><span class="detail-label">Layout</span><span id="pdp-layout" class="detail-value"></span></div>
+                <div class="detail-item"><span class="detail-label">Sq Ft</span><span id="pdp-sqft" class="detail-value"></span></div>
+                <div class="detail-item"><span class="detail-label">Commute</span><span id="pdp-commute-time" class="detail-value"></span></div>
             </div>
-
-            <div class="pdp-scores-section">
-                <h3>Score Breakdown</h3>
-                <div id="pdp-score-bars" class="score-bars"></div>
-            </div>
-
+            <div class="pdp-scores-section"><h3>Score Breakdown</h3><div id="pdp-score-bars" class="score-bars"></div></div>
             <div class="pdp-amenities-section">
                 <h3>Amenities</h3>
                 <div class="amenities-columns">
-                    <div class="amenity-col">
-                        <h4>✅ Necessities</h4>
-                        <ul id="pdp-necessities"></ul>
-                    </div>
-                    <div class="amenity-col">
-                        <h4>⭐ Nice-to-Haves</h4>
-                        <ul id="pdp-nice-to-haves"></ul>
-                    </div>
+                    <div class="amenity-col"><h4>✅ Necessities</h4><ul id="pdp-necessities"></ul></div>
+                    <div class="amenity-col"><h4>⭐ Nice-to-Haves</h4><ul id="pdp-nice-to-haves"></ul></div>
                 </div>
             </div>
-
             <div id="pdp-tour-section" class="pdp-tour-section" style="display:none;">
                 <h3>3D Tour</h3>
                 <a id="pdp-tour-link" href="#" target="_blank" class="tour-btn">🎥 Launch Virtual Tour</a>
             </div>
-
-            <div class="pdp-neighborhood-section">
-                <h3>Neighborhood Highlights</h3>
-                <div id="pdp-neighborhood-details" class="neighborhood-grid"></div>
-            </div>
-
-            <!-- Edit scores section -->
+            <div class="pdp-neighborhood-section"><h3>Neighborhood Highlights</h3><div id="pdp-neighborhood-details" class="neighborhood-grid"></div></div>
             <div class="pdp-edit-section" style="padding:32px; border-top: 1px solid #f0f0f0;">
                 <h3>Edit Details</h3>
                 <p style="color:#6e6e73; font-size:14px; margin-bottom:16px;">Adjust any auto-detected values that need correction</p>
@@ -120,7 +88,7 @@
         </div>
     </div>
 
-    <!-- COMPARE VIEW -->
+    <!-- COMPARE -->
     <div id="compare-view" class="view">
         <h2>Compare Apartments</h2>
         <div class="compare-selector">
@@ -131,25 +99,36 @@
         <div id="compare-table-container" class="compare-table-container"></div>
     </div>
 
-    <!-- ADD APARTMENT VIEW - NOW SIMPLIFIED -->
+    <!-- ADD APARTMENT -->
     <div id="add-view" class="view">
         <h2>Add New Apartment</h2>
 
-        <!-- URL Input (Primary) -->
-        <div class="form-section" id="url-input-section">
-            <h3>Paste Listing URL</h3>
-            <p class="form-note">Drop in a link from apartments.com, zillow, or any apartment website</p>
-            <div class="form-group">
-                <input type="url" id="input-url" placeholder="https://www.apartments.com/..." 
-                       style="font-size:18px; padding:16px;">
+        <!-- PASTE SOURCE METHOD -->
+        <div class="form-section" id="source-input-section">
+            <h3>Paste from Apartments.com</h3>
+            <p class="form-note">3 easy steps:</p>
+            <div style="background:#f5f5f7; border-radius:12px; padding:16px; margin-bottom:16px; font-size:14px; line-height:1.8;">
+                <strong>1.</strong> Go to the apartment listing on apartments.com<br>
+                <strong>2.</strong> Right-click anywhere → "View Page Source"<br>
+                <strong>3.</strong> Press Ctrl+A (select all), then Ctrl+C (copy), then paste below
             </div>
-            <button class="submit-btn" onclick="scoreFromURL()" id="score-btn">
+            <div class="form-group">
+                <label>Listing URL (for your reference)</label>
+                <input type="url" id="input-url" placeholder="https://www.apartments.com/...">
+            </div>
+            <div class="form-group">
+                <label>Page Source Code</label>
+                <textarea id="input-source" rows="6" 
+                    style="width:100%; padding:12px; border:1px solid #d2d2d7; border-radius:10px; font-family:monospace; font-size:12px; resize:vertical;"
+                    placeholder="Paste the entire page source here..."></textarea>
+            </div>
+            <button class="submit-btn" onclick="scoreFromSource()" id="score-btn">
                 Score This Apartment 🎯
             </button>
             <div id="score-status" style="margin-top:16px; display:none;"></div>
         </div>
 
-        <!-- Manual Fallback (Hidden by default) -->
+        <!-- MANUAL FALLBACK -->
         <div id="manual-section" style="display:none;">
             <div class="form-section">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -157,7 +136,6 @@
                     <span style="color:#6e6e73; font-size:13px;">Fields marked with * are required</span>
                 </div>
                 <p class="form-note" id="manual-reason"></p>
-
                 <div class="form-group">
                     <label>Apartment Name *</label>
                     <input type="text" id="input-name" placeholder="e.g., The Fred Apartments">
@@ -167,76 +145,39 @@
                     <input type="text" id="input-address" placeholder="e.g., 4660 W 77th St, Edina, MN 55435">
                 </div>
                 <div class="form-row">
-                    <div class="form-group">
-                        <label>Monthly Rent ($) *</label>
-                        <input type="number" id="input-rent" placeholder="2200">
-                    </div>
-                    <div class="form-group">
-                        <label>Bedrooms</label>
-                        <input type="number" id="input-beds" value="2">
-                    </div>
-                    <div class="form-group">
-                        <label>Bathrooms</label>
-                        <input type="number" id="input-baths" value="2">
-                    </div>
-                    <div class="form-group">
-                        <label>Square Footage</label>
-                        <input type="number" id="input-sqft" placeholder="1050">
-                    </div>
+                    <div class="form-group"><label>Monthly Rent ($) *</label><input type="number" id="input-rent" placeholder="2200"></div>
+                    <div class="form-group"><label>Bedrooms</label><input type="number" id="input-beds" value="2"></div>
+                    <div class="form-group"><label>Bathrooms</label><input type="number" id="input-baths" value="2"></div>
+                    <div class="form-group"><label>Square Footage</label><input type="number" id="input-sqft" placeholder="1050"></div>
                 </div>
             </div>
-
             <div class="form-section">
                 <h3>Amenities</h3>
                 <h4 style="margin-bottom:8px;">Necessities</h4>
                 <p class="form-note">⚠️ Missing any = 0 score</p>
                 <div class="checkbox-grid" style="margin-bottom:20px;">
-                    <label class="checkbox-item necessity">
-                        <input type="checkbox" name="amenity" value="covered_parking"> Covered Parking
-                    </label>
-                    <label class="checkbox-item necessity">
-                        <input type="checkbox" name="amenity" value="dishwasher"> Dishwasher
-                    </label>
-                    <label class="checkbox-item necessity">
-                        <input type="checkbox" name="amenity" value="in_unit_laundry"> In-Unit Laundry
-                    </label>
-                    <label class="checkbox-item necessity">
-                        <input type="checkbox" name="amenity" value="ac"> Air Conditioning
-                    </label>
+                    <label class="checkbox-item necessity"><input type="checkbox" name="amenity" value="covered_parking"> Covered Parking</label>
+                    <label class="checkbox-item necessity"><input type="checkbox" name="amenity" value="dishwasher"> Dishwasher</label>
+                    <label class="checkbox-item necessity"><input type="checkbox" name="amenity" value="in_unit_laundry"> In-Unit Laundry</label>
+                    <label class="checkbox-item necessity"><input type="checkbox" name="amenity" value="ac"> Air Conditioning</label>
                 </div>
                 <h4 style="margin-bottom:8px;">Nice-to-Haves</h4>
                 <div class="checkbox-grid">
-                    <label class="checkbox-item">
-                        <input type="checkbox" name="amenity" value="pool"> Pool
-                    </label>
-                    <label class="checkbox-item">
-                        <input type="checkbox" name="amenity" value="sauna_hot_tub"> Sauna / Hot Tub
-                    </label>
-                    <label class="checkbox-item">
-                        <input type="checkbox" name="amenity" value="gym"> Gym / Fitness
-                    </label>
-                    <label class="checkbox-item">
-                        <input type="checkbox" name="amenity" value="package_lockers"> Package Lockers
-                    </label>
+                    <label class="checkbox-item"><input type="checkbox" name="amenity" value="pool"> Pool</label>
+                    <label class="checkbox-item"><input type="checkbox" name="amenity" value="sauna_hot_tub"> Sauna / Hot Tub</label>
+                    <label class="checkbox-item"><input type="checkbox" name="amenity" value="gym"> Gym / Fitness</label>
+                    <label class="checkbox-item"><input type="checkbox" name="amenity" value="package_lockers"> Package Lockers</label>
                 </div>
             </div>
-
             <div class="form-section">
                 <h3>3D Tour (optional)</h3>
-                <div class="form-group">
-                    <input type="url" id="input-tour" placeholder="https://my.matterport.com/...">
-                </div>
+                <div class="form-group"><input type="url" id="input-tour" placeholder="https://my.matterport.com/..."></div>
             </div>
-
             <button class="submit-btn" onclick="scoreManual()">Score This Apartment 🎯</button>
         </div>
 
-        <!-- Show manual option link -->
         <p style="text-align:center; margin-top:16px;">
-            <a href="#" onclick="showManualForm('Want to enter details manually instead')" 
-               style="color:#0071e3; font-size:14px;">
-                Or enter details manually →
-            </a>
+            <a href="#" onclick="showManualForm('Enter details manually')" style="color:#0071e3; font-size:14px;">Or enter details manually →</a>
         </p>
     </div>
 
