@@ -51,63 +51,71 @@ AMENITY_KEYWORDS = {
 
 def scrape_apartments_com(url):
     """Scrape an apartments.com listing page."""
-headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept-Encoding": "gzip, deflate, br, zstd",
-        "Cache-Control": "max-age=0",
-        "Sec-Ch-Ua": '"Google Chrome";v="131", "Chromium";v="131", "Not_A Brand";v="24"',
-        "Sec-Ch-Ua-Mobile": "?0",
-        "Sec-Ch-Ua-Platform": '"Windows"',
-        "Sec-Fetch-Dest": "document",
-        "Sec-Fetch-Mode": "navigate",
-        "Sec-Fetch-Site": "none",
-        "Sec-Fetch-User": "?1",
-        "Upgrade-Insecure-Requests": "1",
-    }
+    
+    # Try multiple user agents
+    user_agents = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0",
+    ]
 
-    try:
-        response = requests.get(url, headers=headers, timeout=20)
-        if response.status_code != 200:
-            return {"error": f"Status {response.status_code}", "scraped": False}
-
-        soup = BeautifulSoup(response.text, "html.parser")
-        page_text_lower = soup.get_text(separator=" ").lower()
-
-        data = {
-            "scraped": True,
-            "url": url,
-            "name": None,
-            "address": None,
-            "floor_plans": [],
-            "amenities_raw": [],
-            "amenities_classified": [],
-            "tour_3d": None
+    for ua in user_agents:
+        headers = {
+            "User-Agent": ua,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Sec-Fetch-Dest": "document",
+            "Sec-Fetch-Mode": "navigate",
+            "Sec-Fetch-Site": "none",
+            "Sec-Fetch-User": "?1",
+            "Upgrade-Insecure-Requests": "1",
         }
 
-        # 1. PROPERTY NAME
-        name_el = soup.select_one("h1#propertyName") or soup.select_one("h1.propertyName")
-        if name_el:
-            data["name"] = name_el.text.strip()
+        try:
+            response = requests.get(url, headers=headers, timeout=20)
+            if response.status_code == 200:
+                break
+        except Exception:
+            continue
+    else:
+        return {"error": "Blocked by apartments.com (403)", "scraped": False}
 
-        # 2. ADDRESS
-        data["address"] = extract_address_adc(soup)
+    if response.status_code != 200:
+        return {"error": f"Status {response.status_code}", "scraped": False}
 
-        # 3. FLOOR PLANS
-        data["floor_plans"] = extract_floor_plans_adc(soup)
+    soup = BeautifulSoup(response.text, "html.parser")
+    page_text_lower = soup.get_text(separator=" ").lower()
 
-        # 4. AMENITIES
-        data["amenities_raw"] = extract_amenities_adc(soup)
-        data["amenities_classified"] = classify_amenities_adc(data["amenities_raw"], page_text_lower)
+    data = {
+        "scraped": True,
+        "url": url,
+        "name": None,
+        "address": None,
+        "floor_plans": [],
+        "amenities_raw": [],
+        "amenities_classified": [],
+        "tour_3d": None
+    }
 
-        # 5. 3D TOUR / VIRTUAL TOUR
-        data["tour_3d"] = extract_tour_adc(soup)
+    # 1. PROPERTY NAME
+    name_el = soup.select_one("h1#propertyName") or soup.select_one("h1.propertyName")
+    if name_el:
+        data["name"] = name_el.text.strip()
 
-        return data
+    # 2. ADDRESS
+    data["address"] = extract_address_adc(soup)
 
-    except Exception as e:
-        return {"error": str(e), "scraped": False}
+    # 3. FLOOR PLANS
+    data["floor_plans"] = extract_floor_plans_adc(soup)
+
+    # 4. AMENITIES
+    data["amenities_raw"] = extract_amenities_adc(soup)
+    data["amenities_classified"] = classify_amenities_adc(data["amenities_raw"], page_text_lower)
+
+    # 5. 3D TOUR
+    data["tour_3d"] = extract_tour_adc(soup)
+
+    return data
 
 
 def extract_address_adc(soup):
