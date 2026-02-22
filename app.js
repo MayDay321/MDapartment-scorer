@@ -472,17 +472,52 @@ function openPDP(id) {
         tourSection.style.display = "none";
     }
 
-   // Neighborhood highlights
+// Neighborhood highlights with details
     const nhData = apt.neighborhood_data || {};
-    let nhHTML = SCORE_CATEGORIES.filter(c =>
+    
+    document.getElementById("pdp-neighborhood-details").innerHTML = SCORE_CATEGORIES.filter(c =>
         ["schools", "crime", "restaurants", "commute", "nightlife", "grocery"].includes(c.key)
     ).map(cat => {
         const score = scores[cat.key] || 0;
+        let details = "";
+
+        if (cat.key === "grocery" && nhData.grocery_stores) {
+            details = nhData.grocery_stores.slice(0, 5).map(g => 
+                `<span style="font-size:12px; color:#6e6e73; display:block;">${g.name} — ${g.distance_miles} mi</span>`
+            ).join("");
+            if (nhData.costco_distance) {
+                details += `<span style="font-size:12px; color:#248a3d; display:block; font-weight:600;">Costco — ${nhData.costco_distance} mi</span>`;
+            }
+        }
+        if (cat.key === "restaurants" && nhData.restaurants_nearby) {
+            details = nhData.restaurants_nearby.slice(0, 5).map(r =>
+                `<span style="font-size:12px; color:#6e6e73; display:block;">${r.name} — ${r.distance_miles} mi</span>`
+            ).join("");
+            details += `<span style="font-size:12px; color:#6e6e73; display:block; margin-top:4px;">${nhData.restaurant_count || 0} total nearby</span>`;
+        }
+        if (cat.key === "nightlife" && nhData.nightlife_nearby) {
+            details = nhData.nightlife_nearby.slice(0, 5).map(n =>
+                `<span style="font-size:12px; color:#6e6e73; display:block;">${n.name} — ${n.distance_miles} mi</span>`
+            ).join("");
+        }
+        if (cat.key === "commute") {
+            const mins = nhData.commute_minutes;
+            if (mins) details = `<span style="font-size:12px; color:#6e6e73; display:block;">${mins} min drive to Hopkins</span>`;
+            details += `<span style="font-size:12px; color:#6e6e73; display:block;">Transit: ${nhData.transit_level || "unknown"}</span>`;
+        }
+        if (cat.key === "schools" && nhData.schools_nearby) {
+            details = nhData.schools_nearby.slice(0, 3).map(s =>
+                `<span style="font-size:12px; color:#6e6e73; display:block;">${s.name} — ${s.distance_miles} mi</span>`
+            ).join("");
+        }
+
         return `
-            <div class="neighborhood-card">
-                <span class="nh-icon">${cat.icon}</span>
-                <span class="nh-label">${cat.label}</span>
-                <span class="nh-value text-${getScoreColor(score)}">${score}/100</span>
+            <div class="neighborhood-card" style="text-align:left; padding:20px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <span style="font-size:15px; font-weight:600;">${cat.icon} ${cat.label}</span>
+                    <span class="text-${getScoreColor(score)}" style="font-size:20px; font-weight:700;">${score}</span>
+                </div>
+                ${details}
             </div>`;
     }).join("");
 
