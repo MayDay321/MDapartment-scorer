@@ -472,7 +472,9 @@ function openPDP(id) {
         tourSection.style.display = "none";
     }
 
-    document.getElementById("pdp-neighborhood-details").innerHTML = SCORE_CATEGORIES.filter(c =>
+   // Neighborhood highlights
+    const nhData = apt.neighborhood_data || {};
+    let nhHTML = SCORE_CATEGORIES.filter(c =>
         ["schools", "crime", "restaurants", "commute", "nightlife", "grocery"].includes(c.key)
     ).map(cat => {
         const score = scores[cat.key] || 0;
@@ -483,6 +485,50 @@ function openPDP(id) {
                 <span class="nh-value text-${getScoreColor(score)}">${score}/100</span>
             </div>`;
     }).join("");
+
+    document.getElementById("pdp-neighborhood-details").innerHTML = nhHTML;
+
+    // Add nearby places details below neighborhood cards
+    let placesHTML = "";
+
+    const groceryStores = nhData.grocery_stores || [];
+    if (groceryStores.length > 0) {
+        placesHTML += `<div style="margin-top:20px;"><h4 style="margin-bottom:8px;">🛒 Nearby Grocery</h4>`;
+        placesHTML += groceryStores.slice(0, 8).map(g =>
+            `<span style="display:inline-block; background:#f5f5f7; padding:6px 12px; border-radius:8px; margin:4px; font-size:13px;">${g.name} (${g.distance_miles} mi)</span>`
+        ).join("");
+        if (nhData.has_costco) {
+            placesHTML += `<p style="color:#248a3d; font-size:13px; margin-top:8px;">🎯 Costco: ${nhData.costco_distance} miles away</p>`;
+        }
+        placesHTML += `</div>`;
+    }
+
+    const restaurants = nhData.restaurants_nearby || [];
+    if (restaurants.length > 0) {
+        placesHTML += `<div style="margin-top:16px;"><h4 style="margin-bottom:8px;">🍽️ Nearby Restaurants</h4>`;
+        placesHTML += restaurants.slice(0, 8).map(r =>
+            `<span style="display:inline-block; background:#f5f5f7; padding:6px 12px; border-radius:8px; margin:4px; font-size:13px;">${r.name} (${r.distance_miles} mi)</span>`
+        ).join("");
+        placesHTML += `</div>`;
+    }
+
+    const nightlife = nhData.nightlife_nearby || [];
+    if (nightlife.length > 0) {
+        placesHTML += `<div style="margin-top:16px;"><h4 style="margin-bottom:8px;">🎶 Nearby Nightlife</h4>`;
+        placesHTML += nightlife.slice(0, 8).map(n =>
+            `<span style="display:inline-block; background:#f5f5f7; padding:6px 12px; border-radius:8px; margin:4px; font-size:13px;">${n.name} (${n.distance_miles} mi)</span>`
+        ).join("");
+        placesHTML += `</div>`;
+    }
+
+    if (nhData.commute_minutes) {
+        placesHTML += `<div style="margin-top:16px;"><h4 style="margin-bottom:8px;">🚗 Commute</h4>`;
+        placesHTML += `<p style="font-size:14px;">Estimated ${nhData.commute_minutes} min drive to Hopkins</p></div>`;
+    }
+
+    if (placesHTML) {
+        document.getElementById("pdp-neighborhood-details").innerHTML += placesHTML;
+    }
 
     document.getElementById("pdp-edit-form").innerHTML = `
         <div class="form-row" style="margin-bottom:16px;">
