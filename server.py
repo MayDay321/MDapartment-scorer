@@ -120,59 +120,66 @@ def scrape_apartments_com(url):
 
 def extract_address_adc(soup):
     """Extract address from apartments.com."""
-    parts = []
+    street = ""
+    city = ""
+    state = ""
+    zipcode = ""
 
     # Street address
-    street = soup.select_one("span.delivery-address")
+    street_el = soup.select_one("span.delivery-address")
+    if street_el:
+        street = street_el.text.strip().rstrip(",").strip()
+
+    # City, State, Zip from the address container
+    addr_container = soup.select_one("div.propertyAddressContainer")
+    if addr_container:
+        h2 = addr_container.find("h2")
+        if h2:
+            # Get all direct text and spans
+            all_spans = h2.find_all("span")
+            for span in all_spans:
+                cls = " ".join(span.get("class", []))
+                text = span.text.strip().rstrip(",").strip()
+
+                if "delivery-address" in cls:
+                    continue
+                elif "stateZipContainer" in cls:
+                    inner = span.find_all("span")
+                    for s in inner:
+                        t = s.text.strip()
+                        if len(t) == 2 and t.isupper():
+                            state = t
+                        elif t.isdigit() and len(t) == 5:
+                            zipcode = t
+                elif "neighborhoodAddress" in cls:
+                    continue
+                elif text and not city and text != street:
+                    city = text
+
+    # If we still don't have city, try neighborhoodAddress
+    if not city:
+        neighborhood = soup.select_one("span.neighborhoodAddress")
+        if neighborhood:
+            # Often contains "Edina" or similar
+            text = neighborhood.text.strip().rstrip(",").strip()
+            if text:
+                city = text.split(",")[0].strip()
+
+    # Build full address
+    parts = []
     if street:
-        parts.append(street.text.strip().rstrip(","))
-
-    # City
-    city_el = soup.select_one("div.propertyAddressContainer h2")
-    if city_el:
-        # Get all span text after the street
-        spans = city_el.find_all("span")
-        city = None
-        state = None
-        zipcode = None
-        for span in spans:
-            cls = span.get("class", [])
-            text = span.text.strip().rstrip(",").strip()
-            if "delivery-address" in cls:
-                continue
-            elif "stateZipContainer" in cls:
-                inner_spans = span.find_all("span")
-                for inner in inner_spans:
-                    t = inner.text.strip()
-                    if len(t) == 2 and t.isupper():
-                        state = t
-                    elif t.isdigit() and len(t) == 5:
-                        zipcode = t
-            elif text and not city and "neighborhoodAddress" not in str(cls):
-                city = text
-
-        if city:
-            parts.append(city)
-        if state:
-            parts.append(state)
-        if zipcode:
-            # Append zip to the last part
-            if parts:
-                parts[-1] = parts[-1] + " " + zipcode
+        parts.append(street)
+    if city:
+        parts.append(city)
+    if state and zipcode:
+        parts.append(f"{state} {zipcode}")
+    elif state:
+        parts.append(state)
 
     if parts:
         return ", ".join(parts)
 
-    # Fallback: try to find any address-like text
-    addr_container = soup.select_one("div.propertyAddressContainer")
-    if addr_container:
-        text = addr_container.get_text(separator=" ").strip()
-        text = re.sub(r'\s+', ' ', text)
-        if text:
-            return text[:200]
-
     return None
-
 
 def extract_floor_plans_adc(soup):
     """Extract all floor plans from apartments.com pricing grid."""
