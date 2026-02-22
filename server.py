@@ -718,7 +718,95 @@ def score_from_url():
         }
     })
 
+@app.route("/api/score-source", methods=["POST"])
+def score_from_source():
+    """Parse raw HTML source from apartments.com."""
+    body = request.json
+    source = body.get("source", "")
+    url = body.get("url", "")
 
+    if not source:
+        return jsonify({"status": "error", "error": "No source provided"})
+
+    soup = BeautifulSoup(source, "html.parser")
+    page_text_lower = soup.get_text(separator=" ").lower()
+
+    # Parse using apartments.com selectors
+    name = None
+    name_el = soup.select_one("h1#propertyName") or soup.select_one("h1.propertyName")
+    if name_el:
+        name = name_el.text.strip()
+
+    address = extract_address_adc(soup)
+    floor_plans = extract_floor_plans_adc(soup)
+    amenities_raw = extract_amenities_adc(soup)
+    amenities_classified = classify_amenities_adc(amenities_raw, page_text_lower)
+    tour = extract_tour_adc(soup)
+
+    if not floor_plans:
+        return jsonify({"status": "no_plans", "error": "No floor plans found"})
+
+    # Filter to 2bd/2ba
+    matching = [p for p in floor_plans if p.get("bedrooms") == 2 and p.get("bathrooms") == 2]
+    if not matching:
+        matching = [p for p in floor_plans if p.get("bedrooms") == 2]
+    if not matching:
+        matching = floor_plans
+
+    # Geocode + neighborhood
+    neighborhood = {}
+    coords = None
+    if address:
+        coords = geocode(address)
+        if coords:
+            neighborhood = fetch_neighborhood(coords["lat"], coords["lon"])
+
+    scored_plans = []
+    for i, plan in enumerate(matching):
+        rent = plan.get("rent", 0)
+        if not rent and plan.get("units"):
+            rents = [u["rent"] for u in plan["units"] if u.get("rent")]
+            rent = min(rents) if rents else 0
+
+        apt = {
+            "name": name or "Unknown",
+            "address": address or "",
+            "url": url,
+            "rent": rent,
+            "bedrooms": plan.get("bedrooms", 2),
+            "bathrooms": plan.get("bathrooms", 2),
+            "sqft": plan.get("sqft", 0),
+            "amenities": amenities_classified,
+            "amenities_raw": amenities_raw,
+            "tour_3d": tour,
+            "plan_name": plan.get("plan_name"),
+            "units_available": plan.get("units", []),
+            "deposit": plan.get("deposit"),
+            "neighborhood_data": neighborhood,
+            "id": str(int(time.time() * 1000)) + str(i)
+        }
+        if coords:
+            apt["lat"] = coords["lat"]
+            apt["lon"] = coords["lon"]
+
+        apt["scores"] = calculate_all_scores(apt, neighborhood)
+        scored_plans.append(apt)
+
+    apartment_db.extend(scored_plans)
+
+    return jsonify({
+        "status": "success",
+        "apartments": scored_plans,
+        "total_plans_found": len(floor_plans),
+        "matching_plans": len(matching),
+        "scrape_info": {
+            "name": name,
+            "address": address,
+            "amenities_detected": amenities_classified,
+            "amenities_raw": amenities_raw,
+            "tour_found": tour is not None
+        }
+    })
 @app.route("/api/score-manual", methods=["POST"])
 def score_manual():
     body = request.json
