@@ -175,7 +175,58 @@ function showView(viewName) {
     if (viewName === "compare") renderCompareSelector();
 }
 
+async function scoreFromSource() {
+    const sourceCode = document.getElementById("input-source").value.trim();
+    const url = document.getElementById("input-url").value.trim();
 
+    if (!sourceCode) {
+        showStatus("Please paste the page source code first!", "error");
+        return;
+    }
+
+    if (sourceCode.length < 1000) {
+        showStatus("That doesn't look like a full page source. Make sure you copied everything (Ctrl+A then Ctrl+C).", "error");
+        return;
+    }
+
+    const btn = document.getElementById("score-btn");
+    btn.disabled = true;
+    btn.textContent = "🔍 Parsing & Analyzing... (up to 60 sec)";
+    showStatus("Parsing apartment data and fetching neighborhood scores...", "loading");
+
+    try {
+        const response = await fetch(`${API_URL}/api/score-source`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ source: sourceCode, url: url })
+        });
+
+        if (!response.ok) throw new Error(`Server error: ${response.status}`);
+        const data = await response.json();
+
+        if (data.status === "success" && data.apartments && data.apartments.length > 0) {
+            data.apartments.forEach(apt => addApartmentLocal(apt));
+            showStatus(
+                `✅ Found ${data.total_plans_found} floor plans, ${data.matching_plans} matching 2bd/2ba. Scored!`,
+                "success"
+            );
+            setTimeout(() => openPDP(data.apartments[0].id), 800);
+        } else if (data.status === "no_plans") {
+            showStatus("⚠️ No floor plans found in the source. Try manual entry.", "error");
+            showManualForm("Could not detect floor plans from the page source");
+        } else {
+            showStatus("⚠️ " + (data.error || "Something went wrong"), "error");
+            showManualForm(data.error || "Please enter details manually");
+        }
+    } catch (err) {
+        console.error("Score error:", err);
+        showStatus(`⚠️ ${err.message}`, "error");
+        showManualForm("Parsing failed");
+    }
+
+    btn.disabled = false;
+    btn.textContent = "Score This Apartment 🎯";
+}
 // ============================================
 // URL SCORING
 // ============================================
